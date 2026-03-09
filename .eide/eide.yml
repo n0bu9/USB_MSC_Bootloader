@@ -1,0 +1,75 @@
+version: "4.1"
+name: Bootloader_USB_MSC
+type: C51
+deviceName: null
+packDir: null
+srcDirs: []
+virtualFolder:
+  name: <virtual_root>
+  files: []
+  folders:
+    - name: common
+      files:
+        - path: STARTUP.A51
+        - path: Code/common/ch554.h
+        - path: Code/common/main.c
+        - path: Code/common/stdint.h
+        - path: Code/common/system_ch55x.c
+        - path: Code/common/system_ch55x.h
+        - path: Code/common/gpio.c
+        - path: Code/common/gpio.h
+      folders: []
+    - name: boot
+      files: []
+      folders: []
+    - name: usb
+      files: []
+      folders: []
+    - name: msc
+      files: []
+      folders: []
+    - name: flash
+      files: []
+      folders: []
+    - name: fs
+      files: []
+      folders: []
+    - name: app_test
+      files: []
+      folders: []
+dependenceList: []
+outDir: build
+miscInfo:
+  uid: dbc57a85fb244b153112b977257ecbc9
+targets:
+  Target 1:
+    cppPreprocessAttrs:
+      defineList: []
+      incList:
+        - d:/keil_c51/C51/INC/WCH
+      libList: []
+    excludeList: []
+    toolchain: Keil_C51
+    toolchainConfigMap:
+      Keil_C51:
+        options:
+          version: 2
+          afterBuildTasks: []
+          asm-compiler: {}
+          beforeBuildTasks: []
+          c/cpp-compiler:
+            optimization-level: level-8
+            optimization-type: SPEED
+          global:
+            ram-mode: SMALL
+            rom-mode: LARGE
+          linker:
+            misc-controls: ""
+            output-format: elf
+            remove-unused: true
+    uploadConfigMap:
+      Custom:
+        bin: ""
+        commandLine: ""
+        eraseChipCommand: ""
+    uploader: Custom
