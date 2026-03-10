@@ -381,6 +381,31 @@
               <FileType>2</FileType>
               <FilePath>.\STARTUP.A51</FilePath>
             </File>
+            <File>
+              <FileName>ch554.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Code\common\ch554.h</FilePath>
+            </File>
+            <File>
+              <FileName>stdint.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Code\common\stdint.h</FilePath>
+            </File>
+            <File>
+              <FileName>system_ch55x.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Code\common\system_ch55x.c</FilePath>
+            </File>
+            <File>
+              <FileName>system_ch55x.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Code\common\system_ch55x.h</FilePath>
+            </File>
+            <File>
+              <FileName>main.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Code\common\main.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

@@ -11,16 +11,18 @@ virtualFolder:
     - name: common
       files:
         - path: STARTUP.A51
-        - path: Code/common/ch554.h
         - path: Code/common/main.c
-        - path: Code/common/stdint.h
-        - path: Code/common/system_ch55x.c
-        - path: Code/common/system_ch55x.h
-        - path: Code/common/gpio.c
-        - path: Code/common/gpio.h
-      folders: []
+        - path: Code/common/bsp_led.c
+      folders:
+        - name: ch55x
+          files:
+            - path: Code/common/ch55x/gpio.c
+            - path: Code/common/ch55x/system_ch55x.c
+          folders: []
     - name: boot
-      files: []
+      files:
+        - path: Code/boot/bootloader.c
+        - path: Code/boot/bootloader.h
       folders: []
     - name: usb
       files: []
@@ -47,6 +49,9 @@ targets:
       defineList: []
       incList:
         - d:/keil_c51/C51/INC/WCH
+        - Code/common
+        - Code/common/ch55x
+        - Code/boot
       libList: []
     excludeList: []
     toolchain: Keil_C51
