@@ -22,7 +22,9 @@
             "*.c++": "cpp",
             "*.cpp": "cpp",
             "*.cxx": "cpp",
-            "*.cc": "cpp"
+            "*.cc": "cpp",
+            "CH554UFI.C": "cpp",
+            "CH554UFI.H": "cpp"
         },
         "[yaml]": {
             "editor.insertSpaces": true,
