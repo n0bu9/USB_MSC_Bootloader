@@ -24,7 +24,8 @@
             "*.cxx": "cpp",
             "*.cc": "cpp",
             "CH554UFI.C": "cpp",
-            "CH554UFI.H": "cpp"
+            "CH554UFI.H": "cpp",
+            "STRING.H": "cpp"
         },
         "[yaml]": {
             "editor.insertSpaces": true,

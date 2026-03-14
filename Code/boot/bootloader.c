@@ -1,44 +1,52 @@
 #include "bootloader.h"
 #include "system_ch55x.h"
 #include "bsp_led.h"
+#include "usb_msc.h"
 
 typedef void(*pTaskFn)(void);
 pTaskFn userTask;
 
-void __bl_led_task(boot_state_t boot_state)
-{
-    switch (boot_state)
-    {
-    case BOOT_WAIT_USB:
-        /* code */
-        break;
+// void __bl_led_task(boot_state_t boot_state)
+// {
+//     switch (boot_state)
+//     {
+//     case BOOT_WAIT_USB:
+//         /* code */
+//         break;
 
-    default:
-        break;
-    }
-}
+//     default:
+//         break;
+//     }
+// }
 
 void __bl_states_task(boot_state_t *boot_state)
 {
     switch (*boot_state)
     {
     case BOOT_INIT:
-        Port_LED_Init();
+        usbfs_device_init();
         *boot_state = BOOT_WAIT_USB;
         break;
 
     case BOOT_WAIT_USB:
-        LED_ON();
-        delay_ms(500);
-        LED_OFF();
-        delay_ms(500);
-        // 等待USB连接，连接成功后切换到BOOT_IDLE
-        // if (usb_connected()) {
-        //     *boot_state = BOOT_IDLE;
-        // }
+        if (USB_INT_FG) usbfs_device_polling();
+        if (usbfs_all_descriptors_reported())
+        {
+            *boot_state = BOOT_IDLE;
+        }
         break;
 
     case BOOT_IDLE:
+        if (USB_INT_FG) usbfs_device_polling();
+        if (!usbfs_all_descriptors_reported())
+        {
+            *boot_state = BOOT_WAIT_USB;
+            break;
+        }
+        // LED_ON();
+        // delay_ms(500);
+        // LED_OFF();
+        // delay_ms(500);
         // 等待主机发送文件，收到文件后切换到BOOT_RX_FILE
         // if (file_received()) {
         //     *boot_state = BOOT_RX_FILE;
@@ -87,5 +95,6 @@ void bootloader_main_task(void)
     while (1)
     {
         __bl_states_task(&boot_state);
+        delay_ms(1);
     }
 }

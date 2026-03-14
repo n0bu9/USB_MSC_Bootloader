@@ -25,7 +25,8 @@ virtualFolder:
         - path: Code/boot/bootloader.h
       folders: []
     - name: usb
-      files: []
+      files:
+        - path: Code/usb/usb_msc.c
       folders: []
     - name: msc
       files: []
@@ -52,6 +53,7 @@ targets:
         - Code/common
         - Code/common/ch55x
         - Code/boot
+        - Code/usb
       libList: []
     excludeList: []
     toolchain: Keil_C51
@@ -66,12 +68,12 @@ targets:
             optimization-level: level-8
             optimization-type: SPEED
           global:
-            ram-mode: SMALL
+            ram-mode: LARGE
             rom-mode: LARGE
           linker:
-            misc-controls: ""
             output-format: elf
             remove-unused: true
+            use-RTX: None
     uploadConfigMap:
       Custom:
         bin: ""
