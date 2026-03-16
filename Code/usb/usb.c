@@ -1,4 +1,4 @@
-#include "usb_msc.h"
+#include "usb.h"
 #include "string.h"
 
 #define THIS_ENDP0_SIZE		32UL

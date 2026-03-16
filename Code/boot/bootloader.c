@@ -1,7 +1,7 @@
 #include "bootloader.h"
 #include "system_ch55x.h"
 #include "bsp_led.h"
-#include "usb_msc.h"
+#include "usb.h"
 
 typedef void(*pTaskFn)(void);
 pTaskFn userTask;

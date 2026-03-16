@@ -26,7 +26,7 @@ virtualFolder:
       folders: []
     - name: usb
       files:
-        - path: Code/usb/usb_msc.c
+        - path: Code/usb/usb.c
       folders: []
     - name: msc
       files: []
