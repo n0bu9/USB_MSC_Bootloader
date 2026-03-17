@@ -39,34 +39,34 @@ uint8_t UDISK_Inquity_Tab[ ] =
     0x00,                                                /* Reserved */
     0x00,                                                /* Reserved */
     0x00,                                                /* Reserved */
-    'F',                                                 /* Vendor Information */
-    'l',
-    'a',
-    's',
-    'h',
-    ' ',
-    ' ',
-    ' ',
-    'U',
-    'S',
-    'B',
-    ' ',
-    'S',
-    'p',
-    'e',
-    'c',
-    'i',
-    'a',
-    'l',
-    ' ',
-    'D',
-    'i',
-    's',
-    'k',
-    '2',
-    '.',
-    'D',
-    '0'
+    // 'F',                                                 /* Vendor Information */
+    // 'l',
+    // 'a',
+    // 's',
+    // 'h',
+    // ' ',
+    // ' ',
+    // ' ',
+    // 'U',
+    // 'S',
+    // 'B',
+    // ' ',
+    // 'S',
+    // 'p',
+    // 'e',
+    // 'c',
+    // 'i',
+    // 'a',
+    // 'l',
+    // ' ',
+    // 'D',
+    // 'i',
+    // 's',
+    // 'k',
+    // '2',
+    // '.',
+    // 'D',
+    // '0'
 };
 
 /******************************************************************************/
@@ -235,7 +235,7 @@ void UDISK_SCSI_CMD_Deal( void )
     uint8_t i;
 
     if( ( mBOC.mCBW.mCBW_Sig[ 0 ] == 'U' ) && ( mBOC.mCBW.mCBW_Sig[ 1 ] == 'S' )
-      &&( mBOC.mCBW.mCBW_Sig[ 2 ] == 'B' ) && ( mBOC.mCBW.mCBW_Sig[ 3 ] == 'C' ) )
+    &&( mBOC.mCBW.mCBW_Sig[ 2 ] == 'B' ) && ( mBOC.mCBW.mCBW_Sig[ 3 ] == 'C' ) )
     {
         Udisk_CBW_Tag_Save[ 0 ] = mBOC.mCBW.mCBW_Tag[ 0 ];
         Udisk_CBW_Tag_Save[ 1 ] = mBOC.mCBW.mCBW_Tag[ 1 ];
@@ -656,7 +656,7 @@ void UDISK_Up_OnePack( void )
         UDISK_Cur_Sec_Lba++;
     }
     /* Determine whether the current sector data is read and uploaded */
-     if( UDISK_Transfer_DataLen == 0x00 )
+    if( UDISK_Transfer_DataLen == 0x00 )
     {
         Udisk_Transfer_Status &= ~DEF_UDISK_BLUCK_UP_FLAG;
     }
