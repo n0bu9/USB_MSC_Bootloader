@@ -6,6 +6,6 @@
 void main()
 {
     system_init();
-
+    EA = 1;
     bootloader_main_task();
 }

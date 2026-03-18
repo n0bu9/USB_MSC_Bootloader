@@ -1,12 +1,12 @@
-#ifndef __USB_MSC_H__
-#define __USB_MSC_H__
+#ifndef __USB_SCSI_H__
+#define __USB_SCSI_H__
 
 /********************************** (C) COPYRIGHT *******************************
- * File Name          : SW_UDISK.h
+ * File Name          : usb_scsi.h
  * Author             : WCH
  * Version            : V1.0.0
  * Date               : 2022/08/08
- * Description        : header file for SW_UDISK.c
+ * Description        : header file for usb_scsi.c
 *********************************************************************************
 * Copyright (c) 2021 Nanjing Qinheng Microelectronics Co., Ltd.
 * Attention: This software (modified or not) and binary are used for

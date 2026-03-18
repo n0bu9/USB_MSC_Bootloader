@@ -1,4 +1,5 @@
-#include "usb.h"
+#include "usb_basic.h"
+#include "usb_scsi.h"
 #include "string.h"
 
 #define THIS_ENDP0_SIZE		32UL
@@ -96,7 +97,7 @@ void usbfs_device_init(void)
     UDEV_CTRL |= bUD_PORT_EN;                                                  // 允许USB端口
     USB_INT_FG = 0xFF;                                                         // 清中断标志
     USB_INT_EN = bUIE_SUSPEND | bUIE_TRANSFER | bUIE_BUS_RST;                  // 开启总线挂起、传输、总线复位中断、USB传输完成中断
-    // IE_USB = 1;                                                                // 开启USB中断
+    IE_USB = 1;                                                                // 开启USB中断
     usb_descriptor_report_mask = 0;
     usb_descriptor_pending_mask = 0;
 }
@@ -106,7 +107,7 @@ uint8_t usbfs_all_descriptors_reported(void)
     return (usb_descriptor_report_mask == (USB_DESC_REPORTED_DEVICE | USB_DESC_REPORTED_CONFIG)) ? 1 : 0;
 }
 
-void usbfs_device_polling(void)
+void usbfs_device_interrupt(void) interrupt INT_NO_USB using 1
 {
     uint8_t len, desc_len;
     static uint8_t SetupReqCode, SetupLen, UsbConfig;
@@ -124,6 +125,7 @@ void usbfs_device_polling(void)
                     // len = USB_RX_LEN;
                     // memcpy(HID_out_info, ep2_buffer, len);
                     // write_flash()
+
                 }
                 break;
             case UIS_TOKEN_IN | 2:                                    // endpoint 2# 批量端点上传

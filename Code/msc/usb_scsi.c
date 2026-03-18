@@ -1,7 +1,7 @@
-#include "usb_msc.h"
+#include "usb_scsi.h"
 
 /********************************** (C) COPYRIGHT *******************************
-* File Name          : SW_UDISK.C
+* File Name          : usb_scsi.c
 * Author             : WCH
 * Version            : V1.00
 * Date               : 2021/08/01

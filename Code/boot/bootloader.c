@@ -1,7 +1,7 @@
 #include "bootloader.h"
 #include "system_ch55x.h"
 #include "bsp_led.h"
-#include "usb.h"
+#include "usb_basic.h"
 
 typedef void(*pTaskFn)(void);
 pTaskFn userTask;
@@ -29,7 +29,6 @@ void __bl_states_task(boot_state_t *boot_state)
         break;
 
     case BOOT_WAIT_USB:
-        if (USB_INT_FG) usbfs_device_polling();
         if (usbfs_all_descriptors_reported())
         {
             *boot_state = BOOT_IDLE;
@@ -37,7 +36,6 @@ void __bl_states_task(boot_state_t *boot_state)
         break;
 
     case BOOT_IDLE:
-        if (USB_INT_FG) usbfs_device_polling();
         if (!usbfs_all_descriptors_reported())
         {
             *boot_state = BOOT_WAIT_USB;
