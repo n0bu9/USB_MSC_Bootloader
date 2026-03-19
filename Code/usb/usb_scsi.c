@@ -1,5 +1,3 @@
-#include "usb_scsi.h"
-
 /********************************** (C) COPYRIGHT *******************************
 * File Name          : usb_scsi.c
 * Author             : WCH
@@ -14,7 +12,11 @@
 
 /******************************************************************************/
 /* Header Files */
+#include "usb_scsi.h"
 #include "internal_flash.h"
+#include "usb_basic.h"
+#include "string.h"
+
 // #include <SPI_FLASH.h>
 // #include <SW_UDISK.h>
 // #include "usb_lib.h"
@@ -24,7 +26,7 @@
 /* Variable Definition */
 
 uint8_t  UDisk_Down_Buffer[DEF_FLASH_SECTOR_SIZE];
-uint8_t  UDisk_Pack_Buffer[DEF_UDISK_PACK_64];
+uint8_t  UDisk_Pack_Buffer[DEF_UDISK_PACK_32];
 
 /******************************************************************************/
 /* INQUITY */
@@ -39,34 +41,34 @@ uint8_t UDISK_Inquity_Tab[ ] =
     0x00,                                                /* Reserved */
     0x00,                                                /* Reserved */
     0x00,                                                /* Reserved */
-    // 'F',                                                 /* Vendor Information */
-    // 'l',
-    // 'a',
-    // 's',
-    // 'h',
-    // ' ',
-    // ' ',
-    // ' ',
-    // 'U',
-    // 'S',
-    // 'B',
-    // ' ',
-    // 'S',
-    // 'p',
-    // 'e',
-    // 'c',
-    // 'i',
-    // 'a',
-    // 'l',
-    // ' ',
-    // 'D',
-    // 'i',
-    // 's',
-    // 'k',
-    // '2',
-    // '.',
-    // 'D',
-    // '0'
+    'F',                                                 /* Vendor Information */
+    'l',
+    'a',
+    's',
+    'h',
+    ' ',
+    ' ',
+    ' ',
+    'U',
+    'S',
+    'B',
+    ' ',
+    'S',
+    'p',
+    'e',
+    'c',
+    'i',
+    'a',
+    'l',
+    ' ',
+    'D',
+    'i',
+    's',
+    'k',
+    '2',
+    '.',
+    'D',
+    '0'
 };
 
 /******************************************************************************/
@@ -153,11 +155,45 @@ volatile uint8_t  Udisk_CSW_Status = 0x00;
 volatile uint32_t UDISK_Transfer_DataLen = 0x00;
 volatile uint32_t UDISK_Cur_Sec_Lba = 0x00;
 volatile uint16_t UDISK_Sec_Pack_Count = 0x00;
-volatile uint16_t UDISK_Pack_Size = DEF_UDISK_PACK_64;
+volatile uint16_t UDISK_Pack_Size = DEF_UDISK_PACK_32;
 
 BULK_ONLY_CMD mBOC;
 uint8_t   *pEndp2_Buf;
 
+
+/*******************************************************************************
+* Function Name  : UDISK_Init
+* Description    : initialize MSC state machine and logical disk info
+* Input          : None
+* Output         : None
+* Return         : None
+*******************************************************************************/
+void UDISK_Init( void )
+{
+    Udisk_Status = DEF_UDISK_EN_FLAG;
+    Udisk_Capability = MY_UDISK_SIZE;
+    Udisk_Sense_Key = 0x00;
+    Udisk_Sense_ASC = 0x00;
+    Udisk_CSW_Status = 0x00;
+    UDISK_Reset_Bulk_State( );
+}
+
+/*******************************************************************************
+* Function Name  : UDISK_Reset_Bulk_State
+* Description    : clear current BOT transfer context
+* Input          : None
+* Output         : None
+* Return         : None
+*******************************************************************************/
+void UDISK_Reset_Bulk_State( void )
+{
+    Udisk_Transfer_Status = 0x00;
+    Udisk_CSW_Status = 0x00;
+    UDISK_Transfer_DataLen = 0x00;
+    UDISK_Cur_Sec_Lba = 0x00;
+    UDISK_Sec_Pack_Count = 0x00;
+    pEndp2_Buf = NULL;
+}
 
 /*******************************************************************************
 * Function Name  : USIDK_CMD_Deal_Status
@@ -187,15 +223,15 @@ void UDISK_CMD_Deal_Fail( void )
     if( Udisk_Transfer_Status & DEF_UDISK_BLUCK_UP_FLAG )
     {
         /* EP2 -> STALL */
-        SetEPTxStatus(ENDP2, EP_TX_STALL);
+        SetEPTxStatus(EP_NUM_2, EP_TX_STALL);
         Udisk_Transfer_Status &= ~DEF_UDISK_BLUCK_UP_FLAG;
     }
-    if( Udisk_Transfer_Status & DEF_UDISK_BLUCK_DOWN_FLAG )
-    {
-        /* EP3 -> STALL */
-        SetEPRxStatus(ENDP3, EP_RX_STALL);
-        Udisk_Transfer_Status &= ~DEF_UDISK_BLUCK_DOWN_FLAG;
-    }
+    // if( Udisk_Transfer_Status & DEF_UDISK_BLUCK_DOWN_FLAG )
+    // {
+    //     /* EP3 -> STALL */
+    //     SetEPRxStatus(EDP_NUM_3, EP_RX_STALL);
+    //     Udisk_Transfer_Status &= ~DEF_UDISK_BLUCK_DOWN_FLAG;
+    // }
 }
 
 /*******************************************************************************
@@ -582,8 +618,8 @@ void UDISK_Bulk_UpData( void )
     }
 
     /* Load the data into the upload buffer and start the upload */
-    USB_SIL_Write( EP2_IN, pEndp2_Buf, len );
-    SetEPTxStatus( ENDP2, EP_TX_VALID );
+    USB_SIL_Write( EP_NUM_2, pEndp2_Buf, len );
+    SetEPTxStatus( EP_NUM_2, EP_TX_VALID );
 }
 
 /*******************************************************************************
@@ -613,8 +649,8 @@ void UDISK_Up_CSW( void )
     mBOC.mCSW.mCSW_Status = Udisk_CSW_Status;
 
     /* Load the data into the upload buffer and start the upload */
-    USB_SIL_Write( EP2_IN, (uint8_t *)mBOC.buf, 0x0D );
-    SetEPTxStatus( ENDP2, EP_TX_VALID );
+    USB_SIL_Write( EP_NUM_2, (uint8_t *)mBOC.buf, 0x0D );
+    SetEPTxStatus( EP_NUM_2, EP_TX_VALID );
 }
 
 /*******************************************************************************
@@ -640,8 +676,8 @@ void UDISK_Up_OnePack( void )
 #endif
 
     /* USB upload this package data */
-    USB_SIL_Write( EP2_IN, pbuf, UDISK_Pack_Size );
-    SetEPTxStatus( ENDP2, EP_TX_VALID );
+    USB_SIL_Write( EP_NUM_2, pbuf, UDISK_Pack_Size );
+    SetEPTxStatus( EP_NUM_2, EP_TX_VALID );
 
     /* Determine whether the current sector data is read and uploaded */
     UDISK_Sec_Pack_Count++;
@@ -693,7 +729,7 @@ void UDISK_Down_OnePack( uint8_t *pbuf, uint16_t packlen )
 #if (STORAGE_MEDIUM == MEDIUM_SPI_FLASH)
         W25XXX_WR_Block(UDisk_Down_Buffer, sec_start_addr, DEF_FLASH_SECTOR_SIZE );
 #elif (STORAGE_MEDIUM == MEDIUM_INTERAL_FLASH)
-        IFlash_Prog_512(IFLASH_UDISK_START_ADDR + sec_start_addr,(uint32_t*)UDisk_Down_Buffer);
+        // IFlash_Prog_512(IFLASH_UDISK_START_ADDR + sec_start_addr,(uint32_t*)UDisk_Down_Buffer);
 #endif
         if( UDISK_Transfer_DataLen == 0x00 )
         {

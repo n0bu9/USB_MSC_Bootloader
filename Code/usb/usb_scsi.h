@@ -107,6 +107,7 @@ typedef union _BULK_ONLY_CMD
 
 #define DEF_UDISK_PACK_512    	       512
 #define DEF_UDISK_PACK_64              64
+#define DEF_UDISK_PACK_32			   32
 
 /******************************************************************************/
 /* Current u-disk status related macro definition */
@@ -139,14 +140,16 @@ extern uint8_t  const  UDISK_Rd_Capacity[ ];
 extern uint8_t  const  UDISK_Mode_Sense_1A[ ];
 extern uint8_t  const  UDISK_Mode_Senese_5A[ ];
 
-extern void UDISK_CMD_Deal_Status( uint8_t key, uint8_t asc, uint8_t status );
-extern void UDISK_CMD_Deal_Fail( void );
-extern void UDISK_SCSI_CMD_Deal( void );
-extern void UDISK_Bulk_UpData( void );
-extern void UDISK_Up_CSW( void );
-extern void UDISK_Up_OnePack( void );
-extern void UDISK_Out_EP_Deal( uint8_t *pbuf, uint16_t packlen );
-extern void UDISK_In_EP_Deal( void );
-extern void UDISK_Down_OnePack( uint8_t *pbuf, uint16_t packlen );
+void UDISK_CMD_Deal_Status( uint8_t key, uint8_t asc, uint8_t status );
+void UDISK_CMD_Deal_Fail( void );
+void UDISK_Init( void );
+void UDISK_Reset_Bulk_State( void );
+void UDISK_SCSI_CMD_Deal( void );
+void UDISK_Bulk_UpData( void );
+void UDISK_Up_CSW( void );
+void UDISK_Up_OnePack( void );
+void UDISK_Out_EP_Deal( uint8_t *pbuf, uint16_t packlen );
+void UDISK_In_EP_Deal( void );
+void UDISK_Down_OnePack( uint8_t *pbuf, uint16_t packlen );
 
 #endif
