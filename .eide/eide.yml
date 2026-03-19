@@ -27,7 +27,6 @@ virtualFolder:
     - name: usb
       files:
         - path: Code/usb/usb_basic.c
-        - path: Code/usb/usb_scsi.c
       folders: []
     - name: msc
       files: []
@@ -55,7 +54,6 @@ targets:
         - Code/common/ch55x
         - Code/boot
         - Code/usb
-        - Code/flash
       libList: []
     excludeList: []
     toolchain: Keil_C51

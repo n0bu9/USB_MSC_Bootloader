@@ -3,16 +3,16 @@
 // #include "string.h"
 
 #define THIS_ENDP0_SIZE		32UL
-#define THIS_ENDP2_SIZE		64UL
+#define THIS_ENDP2_SIZE		32UL
 #define UsbSetupBuf     ((PUSB_SETUP_REQ)ep0_buffer)
 
 #define USB_DESC_REPORTED_DEVICE    0x01
 #define USB_DESC_REPORTED_CONFIG    0x02
 
 static uint8_t xdata ep0_buffer[THIS_ENDP0_SIZE+2] _at_ 0x0000;    //端点0 OUT&IN缓冲区，必须是偶地址
-static uint8_t xdata ep2_buffer[THIS_ENDP2_SIZE*2] _at_ THIS_ENDP0_SIZE+2;     // endpoint 2 IN[0:63] + OUT[64:127]
+static uint8_t xdata ep2_buffer[THIS_ENDP2_SIZE+2] _at_ THIS_ENDP0_SIZE+2;  //端点1 OUT&IN缓冲区，必须是偶地址
 
-const uint8_t code device_descriptor[] = {
+uint8_t device_descriptor[] = {
     0x12,  // bLength
     0x01,  // bDescriptorType
     0x10, 0x01,  // usb1.1
@@ -107,7 +107,7 @@ void usbfs_device_init(void)
     // EndPoint 2
     UEP2_DMA = ep2_buffer;                                                     // 端点2数据传输地址
     UEP2_3_MOD = UEP2_3_MOD & ~bUEP2_BUF_MOD | bUEP2_TX_EN | bUEP2_RX_EN;      // 端点2 32字节发送(IN)+32字节接收(OUT)缓冲区
-    UEP2_CTRL = UEP_T_RES_NAK | UEP_R_RES_ACK;                                 // 端点2双向同时启用时需手动翻转toggle
+    UEP2_CTRL = bUEP_AUTO_TOG | UEP_T_RES_NAK | UEP_R_RES_ACK;                 // 端点2自动翻转同步标志位，IN事务返回NAK，OUT返回ACK
     // Other Init
     USB_DEV_AD = 0x00;
     UDEV_CTRL = bUD_PD_DIS;                                                    // 禁止DP/DM下拉电阻
@@ -115,91 +115,19 @@ void usbfs_device_init(void)
     UDEV_CTRL |= bUD_PORT_EN;                                                  // 允许USB端口
     USB_INT_FG = 0xFF;                                                         // 清中断标志
     USB_INT_EN = bUIE_SUSPEND | bUIE_TRANSFER | bUIE_BUS_RST;                  // 开启总线挂起、传输、总线复位中断、USB传输完成中断
+    IE_USB = 1;                                                                // 开启USB中断
     usb_descriptor_report_mask = 0;
     usb_descriptor_pending_mask = 0;
-    UDISK_Init();
-    IE_USB = 1;                                                                // 开启USB中断
 }
 
 uint8_t usbfs_all_descriptors_reported(void)
 {
     return (usb_descriptor_report_mask == (USB_DESC_REPORTED_DEVICE | USB_DESC_REPORTED_CONFIG)) ? 1 : 0;
-
-}
-void SetEPTxStatus(uint8_t bEpnum, uint8_t wState)
-{
-    switch (bEpnum)
-    {
-    case EP_NUM_0:
-        _SetEPTxStatus(UEP0_CTRL, wState);
-        break;
-    case EP_NUM_1:
-        _SetEPTxStatus(UEP1_CTRL, wState);
-        break;
-    case EP_NUM_2:
-        _SetEPTxStatus(UEP2_CTRL, wState);
-        break;
-    case EP_NUM_3:
-        _SetEPTxStatus(UEP3_CTRL, wState);
-        break;
-    default:
-        break;
-    }
 }
 
-void SetEPRxStatus(uint8_t bEpnum, uint8_t wState)
-{
-    switch (bEpnum)
-    {
-    case EP_NUM_0:
-        _SetEPRxStatus(UEP0_CTRL, wState);
-        break;
-    case EP_NUM_1:
-        _SetEPRxStatus(UEP1_CTRL, wState);
-        break;
-    case EP_NUM_2:
-        _SetEPRxStatus(UEP2_CTRL, wState);
-        break;
-    case EP_NUM_3:
-        _SetEPRxStatus(UEP3_CTRL, wState);
-        break;
-    default:
-        break;
-    }
-}
-
-/*******************************************************************************
- * @fn                USB_SIL_Write
- *
- * @brief           Write a buffer of data to a selected endpoint.
- *
- * @param          bEpAddr: The address of the non control endpoint.
- *                  pBufferPointer: The pointer to the buffer of data to be written
- *                     to the endpoint.
- *                  wBufferSize: Number of data to be written (in bytes).
- *
- * @return         Status.
- */
-void USB_SIL_Write(uint8_t bEpnum, uint8_t* pBufferPointer, uint32_t wBufferSize)
-{
-    switch (bEpnum)
-    {
-    case EP_NUM_0:
-        USB_CopyCodeToEp0(pBufferPointer, wBufferSize);                                // 加载上传数据
-        UEP0_T_LEN = wBufferSize;                                                       // 上传数据长度
-        break;
-    case EP_NUM_2:
-        USB_CopyCodeToEp2(pBufferPointer, wBufferSize);                             // 加载EP2 IN数据
-        UEP2_T_LEN = wBufferSize;                                                       // 上传数据长度
-        break;
-    default:
-        return;
-    }
-    SetEPTxStatus(bEpnum, EP_TX_ACK);
-}
 void usbfs_device_interrupt(void) interrupt INT_NO_USB using 1
 {
-    uint8_t len, desc_len, request_type, request_recip;
+    uint8_t len, desc_len;
     static uint8_t SetupReqCode, SetupLen, UsbConfig;
     static PUINT8C pDescr;
     if(UIF_TRANSFER)                                                // USB传输完成
@@ -210,64 +138,22 @@ void usbfs_device_interrupt(void) interrupt INT_NO_USB using 1
             switch ( USB_INT_ST & ( MASK_UIS_TOKEN | MASK_UIS_ENDP ) )// 分析操作令牌和端点号
             {
             case UIS_TOKEN_OUT | 2:                                   // endpoint 2# 批量端点下传
-                if ( U_TOG_OK ) {
-                    UEP2_CTRL ^= bUEP_R_TOG;
-                    len = USB_RX_LEN;
-                    UDISK_Out_EP_Deal(ep2_buffer+THIS_ENDP2_SIZE, len);
-                    SetEPRxStatus(EP_NUM_2, EP_RX_VALID);
-                    break;
+                if (U_TOG_OK)                                         // 不同步的数据包将丢弃
+                {
+                    // len = USB_RX_LEN;
+                    // memcpy(HID_out_info, ep2_buffer, len);
+                    // write_flash()
+
                 }
                 break;
             case UIS_TOKEN_IN | 2:                                    // endpoint 2# 批量端点上传
-                UEP2_CTRL ^= bUEP_T_TOG;
-                SetEPTxStatus(EP_NUM_2, EP_TX_NAK);
-                UDISK_In_EP_Deal();
+                UEP2_CTRL = UEP2_CTRL & ~ MASK_UEP_T_RES | UEP_T_RES_NAK;// 暂停上传
                 break;
             case UIS_TOKEN_SETUP | 0:                                 // endpoint 0# SETUP
                 len = USB_RX_LEN;
                 if (len == sizeof(USB_SETUP_REQ))                 // SETUP包长度
                 {
-                    request_type = UsbSetupBuf->bRequestType & USB_REQ_TYP_MASK;
-                    request_recip = UsbSetupBuf->bRequestType & USB_REQ_RECIP_MASK;
-                    if ( ( request_type == USB_REQ_TYP_CLASS ) && ( request_recip == USB_REQ_RECIP_INTERF ) && ( UsbSetupBuf->wIndexL == 0x00 ) )
-                    {
-                        SetupReqCode = UsbSetupBuf->bRequest;
-                        SetupLen = UsbSetupBuf->wLengthL;
-                        len = 0;
-                        desc_len = 0;
-                        usb_descriptor_pending_mask = 0;
-                        switch( SetupReqCode )
-                        {
-                        case CMD_UDISK_GET_MAX_LUN:
-                            if ( ( UsbSetupBuf->bRequestType & 0x80 ) && ( SetupLen == 1 ) )
-                            {
-                                ep0_buffer[ 0 ] = 0x00;
-                                len = 1;
-                            }
-                            else
-                            {
-                                len = 0xFF;
-                            }
-                            break;
-                        case CMD_UDISK_RESET:
-                            if ( ( ( UsbSetupBuf->bRequestType & 0x80 ) == 0x00 ) && ( SetupLen == 0 ) )
-                            {
-                                UDISK_Reset_Bulk_State( );
-                                SetEPTxStatus( EP_NUM_2, EP_TX_NAK );
-                                SetEPRxStatus( EP_NUM_2, EP_RX_VALID );
-                                len = 0;
-                            }
-                            else
-                            {
-                                len = 0xFF;
-                            }
-                            break;
-                        default:
-                            len = 0xFF;
-                            break;
-                        }
-                    }
-                    else if ( request_type != USB_REQ_TYP_STANDARD )
+                    if ( ( UsbSetupBuf->bRequestType & USB_REQ_TYP_MASK ) != USB_REQ_TYP_STANDARD )//只支持标准请求
                     {
                         len = 0xFF;                                   // 操作失败
                     }
@@ -400,12 +286,10 @@ void usbfs_device_interrupt(void) interrupt INT_NO_USB using 1
     {
         UEP0_CTRL = UEP_R_RES_ACK | UEP_T_RES_NAK;
         // UEP1_CTRL = bUEP_AUTO_TOG | UEP_R_RES_ACK;
-        UEP2_CTRL = UEP_R_RES_ACK | UEP_T_RES_NAK;
+        UEP2_CTRL = bUEP_AUTO_TOG | UEP_R_RES_ACK;// | UEP_T_RES_NAK;
         USB_DEV_AD = 0x00;
-        UsbConfig = 0;
         usb_descriptor_report_mask = 0;
         usb_descriptor_pending_mask = 0;
-        UDISK_Init();
         UIF_SUSPEND = 0;
         UIF_TRANSFER = 0;
         UIF_BUS_RST = 0;                                              // 清中断标志
