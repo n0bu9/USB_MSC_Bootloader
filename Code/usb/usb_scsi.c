@@ -26,7 +26,7 @@
 /* Variable Definition */
 
 uint8_t  UDisk_Down_Buffer[DEF_FLASH_SECTOR_SIZE];
-uint8_t  UDisk_Pack_Buffer[DEF_UDISK_PACK_32];
+uint8_t  UDisk_Pack_Buffer[DEF_UDISK_PACK_64];
 
 /******************************************************************************/
 /* INQUITY */
@@ -155,10 +155,30 @@ volatile uint8_t  Udisk_CSW_Status = 0x00;
 volatile uint32_t UDISK_Transfer_DataLen = 0x00;
 volatile uint32_t UDISK_Cur_Sec_Lba = 0x00;
 volatile uint16_t UDISK_Sec_Pack_Count = 0x00;
-volatile uint16_t UDISK_Pack_Size = DEF_UDISK_PACK_32;
+volatile uint16_t UDISK_Pack_Size = DEF_UDISK_PACK_64;
 
 BULK_ONLY_CMD mBOC;
 uint8_t   *pEndp2_Buf;
+
+
+/*******************************************************************************
+* Function Name  : UDISK_Load_OnePack_From_InternalFlash
+* Description    : copy one MSC packet from code flash to the USB staging buffer
+* Input          : address - source flash address
+*                  len     - byte count to copy
+* Output         : None
+* Return         : None
+*******************************************************************************/
+static void UDISK_Load_OnePack_From_InternalFlash( uint16_t address, uint16_t len )
+{
+    uint16_t i;
+    PUINT8C pcode = (PUINT8C)address;
+
+    for( i = 0; i < len; i++ )
+    {
+        UDisk_Pack_Buffer[ i ] = pcode[ i ];
+    }
+}
 
 
 /*******************************************************************************
@@ -663,25 +683,35 @@ void UDISK_Up_CSW( void )
 void UDISK_Up_OnePack( void )
 {
     uint8_t *pbuf = NULL;
+    uint16_t len = UDISK_Pack_Size;
+
+    if( UDISK_Transfer_DataLen < len )
+    {
+        len = (uint16_t)UDISK_Transfer_DataLen;
+    }
 
 #if (STORAGE_MEDIUM == MEDIUM_SPI_FLASH)
     if( UDISK_Sec_Pack_Count == 0x00 )
     {
         FLASH_RD_Block_Start( UDISK_Cur_Sec_Lba * DEF_UDISK_SECTOR_SIZE );
     }
-    FLASH_RD_Block( UDisk_Pack_Buffer, UDISK_Pack_Size );
+    FLASH_RD_Block( UDisk_Pack_Buffer, len );
     pbuf = UDisk_Pack_Buffer;
 #elif (STORAGE_MEDIUM == MEDIUM_INTERAL_FLASH)
-    pbuf = (uint8_t*)(IFLASH_UDISK_START_ADDR + UDISK_Cur_Sec_Lba * DEF_UDISK_SECTOR_SIZE + UDISK_Pack_Size * UDISK_Sec_Pack_Count);
+    UDISK_Load_OnePack_From_InternalFlash(
+        (uint16_t)( IFLASH_UDISK_START_ADDR + UDISK_Cur_Sec_Lba * DEF_UDISK_SECTOR_SIZE + UDISK_Pack_Size * UDISK_Sec_Pack_Count ),
+        len
+    );
+    pbuf = UDisk_Pack_Buffer;
 #endif
 
     /* USB upload this package data */
-    USB_SIL_Write( EP_NUM_2, pbuf, UDISK_Pack_Size );
+    USB_SIL_Write( EP_NUM_2, pbuf, len );
     SetEPTxStatus( EP_NUM_2, EP_TX_VALID );
 
     /* Determine whether the current sector data is read and uploaded */
     UDISK_Sec_Pack_Count++;
-    UDISK_Transfer_DataLen -= UDISK_Pack_Size;
+    UDISK_Transfer_DataLen -= len;
 
     if( UDISK_Sec_Pack_Count == ( DEF_UDISK_SECTOR_SIZE / UDISK_Pack_Size ) )
     {
@@ -717,9 +747,9 @@ void UDISK_Down_OnePack( uint8_t *pbuf, uint16_t packlen )
         FLASH_Erase_Sector(sec_start_addr);
 #endif
     }
-    memcpy(UDisk_Down_Buffer + (uint32_t)UDISK_Sec_Pack_Count * UDISK_Pack_Size ,pbuf, UDISK_Pack_Size);
+    memcpy(UDisk_Down_Buffer + (uint32_t)UDISK_Sec_Pack_Count * UDISK_Pack_Size ,pbuf, packlen);
     UDISK_Sec_Pack_Count++;
-    UDISK_Transfer_DataLen -= UDISK_Pack_Size;
+    UDISK_Transfer_DataLen -= packlen;
 
     if( UDISK_Sec_Pack_Count == ( DEF_UDISK_SECTOR_SIZE / UDISK_Pack_Size ) )
     {

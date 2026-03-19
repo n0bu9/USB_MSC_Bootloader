@@ -1,22 +1,18 @@
 #include "usb_basic.h"
 #include "usb_scsi.h"
-#include "string.h"
+// #include "string.h"
 
 #define THIS_ENDP0_SIZE		32UL
-#define THIS_ENDP2_SIZE		32UL
-#define THIS_ENDP2_BUF_SIZE 64UL
+#define THIS_ENDP2_SIZE		64UL
 #define UsbSetupBuf     ((PUSB_SETUP_REQ)ep0_buffer)
 
 #define USB_DESC_REPORTED_DEVICE    0x01
 #define USB_DESC_REPORTED_CONFIG    0x02
 
 static uint8_t xdata ep0_buffer[THIS_ENDP0_SIZE+2] _at_ 0x0000;    //端点0 OUT&IN缓冲区，必须是偶地址
-static uint8_t xdata ep2_buffer[THIS_ENDP2_SIZE+2] _at_ THIS_ENDP0_SIZE+2;  //端点1 OUT&IN缓冲区，必须是偶地址
+static uint8_t xdata ep2_buffer[THIS_ENDP2_SIZE*2] _at_ THIS_ENDP0_SIZE+2;     // endpoint 2 IN[0:63] + OUT[64:127]
 
-static uint8_t xdata ep2_in_buffer[THIS_ENDP2_BUF_SIZE] _at_ ( THIS_ENDP0_SIZE + 2 + THIS_ENDP2_BUF_SIZE );
-#define ep2_out_buffer    ( ep2_buffer )
-
-uint8_t device_descriptor[] = {
+const uint8_t code device_descriptor[] = {
     0x12,  // bLength
     0x01,  // bDescriptorType
     0x10, 0x01,  // usb1.1
@@ -33,7 +29,7 @@ uint8_t device_descriptor[] = {
     0x01  // bNumConfigurations
 };
 
-uint8_t configuration_descriptor[] = {
+const uint8_t code configuration_descriptor[] = {
     // configuration descriptor
     0x09, // bLength
     0x02, // bDescriptorType
@@ -58,23 +54,41 @@ uint8_t configuration_descriptor[] = {
     0x05, // bDescriptorType
     0x82, // bEndpointAddress
     0x02, // bmAttributes-bulk
-    0x20, 0x00, // wMaxPacketSize
+    0x40, 0x00, // wMaxPacketSize
     0x00, // bInterval
     // bulk-out endpoint descriptor
     0x07, // bLength
     0x05, // bDescriptorType
     0x02, // bEndpointAddress
     0x02, // bmAttributes-bulk
-    0x20, 0x00, // wMaxPacketSize
+    0x40, 0x00, // wMaxPacketSize
     0x00, // bInterval
 };
 
-static uint8_t usb_inbuffer[32];
-static uint8_t usb_outbuffer[32];
-static uint8_t *pDescr; // USB配置标志
 static uint8_t usb_descriptor_report_mask = 0;
 static uint8_t usb_descriptor_pending_mask = 0;
 // static uint8_t SetupReq = 0,SetupLen = 0,Ready = 0,Count = 0,UsbConfig = 0;
+
+static void USB_CopyCodeToEp0( PUINT8C src, uint8_t len )
+{
+    uint8_t i;
+
+    for( i = 0; i < len; i++ )
+    {
+        ep0_buffer[ i ] = src[ i ];
+    }
+}
+
+static void USB_CopyCodeToEp2(PUINT8C src, uint8_t len)
+{
+    uint8_t i;
+
+    for (i = 0; i < len; i++)
+    {
+        ep2_buffer[i] = src[i];
+    }
+
+}
 
 /*******************************************************************************
 * Function Name  : usbfs_device_init()
@@ -166,17 +180,16 @@ void SetEPRxStatus(uint8_t bEpnum, uint8_t wState)
  *
  * @return         Status.
  */
-#define ep2_buffer ep2_in_buffer
 void USB_SIL_Write(uint8_t bEpnum, uint8_t* pBufferPointer, uint32_t wBufferSize)
 {
     switch (bEpnum)
     {
     case EP_NUM_0:
-        memcpy(ep0_buffer, pBufferPointer, wBufferSize);                                // 加载上传数据
+        USB_CopyCodeToEp0(pBufferPointer, wBufferSize);                                // 加载上传数据
         UEP0_T_LEN = wBufferSize;                                                       // 上传数据长度
         break;
     case EP_NUM_2:
-        memcpy(ep2_buffer, pBufferPointer, wBufferSize);                                // 加载上传数据
+        USB_CopyCodeToEp2(pBufferPointer, wBufferSize);                             // 加载EP2 IN数据
         UEP2_T_LEN = wBufferSize;                                                       // 上传数据长度
         break;
     default:
@@ -184,13 +197,11 @@ void USB_SIL_Write(uint8_t bEpnum, uint8_t* pBufferPointer, uint32_t wBufferSize
     }
     SetEPTxStatus(bEpnum, EP_TX_ACK);
 }
-#undef ep2_buffer
-
 void usbfs_device_interrupt(void) interrupt INT_NO_USB using 1
 {
     uint8_t len, desc_len, request_type, request_recip;
     static uint8_t SetupReqCode, SetupLen, UsbConfig;
-    static uint8_t *pDescr;
+    static PUINT8C pDescr;
     if(UIF_TRANSFER)                                                // USB传输完成
     {
         if (U_IS_NAK){}                                             // 本例子可以不必处理NAK
@@ -202,7 +213,7 @@ void usbfs_device_interrupt(void) interrupt INT_NO_USB using 1
                 if ( U_TOG_OK ) {
                     UEP2_CTRL ^= bUEP_R_TOG;
                     len = USB_RX_LEN;
-                    UDISK_Out_EP_Deal(ep2_out_buffer, len);
+                    UDISK_Out_EP_Deal(ep2_buffer+THIS_ENDP2_SIZE, len);
                     SetEPRxStatus(EP_NUM_2, EP_RX_VALID);
                     break;
                 }
@@ -299,7 +310,7 @@ void usbfs_device_interrupt(void) interrupt INT_NO_USB using 1
                                 SetupLen = len;                       // 限制总长度
                             }
                             len = SetupLen >= THIS_ENDP0_SIZE ? THIS_ENDP0_SIZE : SetupLen;// 本次传输长度
-                            memcpy(ep0_buffer, pDescr, len);         // 加载上传数据
+                            USB_CopyCodeToEp0( pDescr, len );        // 加载上传数据
                             SetupLen -= len;
                             pDescr += len;
                             break;
@@ -347,7 +358,7 @@ void usbfs_device_interrupt(void) interrupt INT_NO_USB using 1
                 {
                 case USB_GET_DESCRIPTOR:
                     len = SetupLen >= THIS_ENDP0_SIZE ? THIS_ENDP0_SIZE : SetupLen;// 本次传输长度
-                    memcpy(ep0_buffer, pDescr, len);                 // 加载上传数据
+                    USB_CopyCodeToEp0( pDescr, len );                // 加载上传数据
                     SetupLen -= len;
                     pDescr += len;
                     UEP0_T_LEN = len;
