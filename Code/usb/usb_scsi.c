@@ -26,7 +26,7 @@
 /* Variable Definition */
 
 uint8_t  UDisk_Down_Buffer[DEF_FLASH_SECTOR_SIZE];
-uint8_t  UDisk_Pack_Buffer[DEF_UDISK_PACK_32];
+uint8_t  UDisk_Pack_Buffer[DEF_UDISK_PACK_64];
 
 /******************************************************************************/
 /* INQUITY */
@@ -155,7 +155,7 @@ volatile uint8_t  Udisk_CSW_Status = 0x00;
 volatile uint32_t UDISK_Transfer_DataLen = 0x00;
 volatile uint32_t UDISK_Cur_Sec_Lba = 0x00;
 volatile uint16_t UDISK_Sec_Pack_Count = 0x00;
-volatile uint16_t UDISK_Pack_Size = DEF_UDISK_PACK_32;
+volatile uint16_t UDISK_Pack_Size = DEF_UDISK_PACK_64;
 
 BULK_ONLY_CMD mBOC;
 uint8_t   *pEndp2_Buf;
