@@ -135,10 +135,10 @@ extern volatile uint8_t  Udisk_Status;
 extern volatile uint8_t  Udisk_Transfer_Status;
 extern volatile uint32_t Udisk_Capability;
 extern uint8_t  UDISK_Inquity_Tab[ ];
-extern uint8_t  const  UDISK_Rd_Format_Capacity[ ];
-extern uint8_t  const  UDISK_Rd_Capacity[ ];
-extern uint8_t  const  UDISK_Mode_Sense_1A[ ];
-extern uint8_t  const  UDISK_Mode_Senese_5A[ ];
+extern uint8_t  const code  UDISK_Rd_Format_Capacity[ ];
+extern uint8_t  const code UDISK_Rd_Capacity[ ];
+extern uint8_t  const code UDISK_Mode_Sense_1A[ ];
+extern uint8_t  const code UDISK_Mode_Senese_5A[ ];
 
 void UDISK_CMD_Deal_Status( uint8_t key, uint8_t asc, uint8_t status );
 void UDISK_CMD_Deal_Fail( void );

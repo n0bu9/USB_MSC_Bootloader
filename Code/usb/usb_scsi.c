@@ -27,7 +27,6 @@
 
 uint8_t  UDisk_Down_Buffer[DEF_FLASH_SECTOR_SIZE];
 uint8_t  UDisk_Pack_Buffer[DEF_UDISK_PACK_64];
-
 /******************************************************************************/
 /* INQUITY */
 uint8_t UDISK_Inquity_Tab[ ] =
@@ -73,7 +72,7 @@ uint8_t UDISK_Inquity_Tab[ ] =
 
 /******************************************************************************/
 /* formatted capacity information */
-uint8_t  const  UDISK_Rd_Format_Capacity[ ] =
+const uint8_t code UDISK_Rd_Format_Capacity[ ] =
 {
     0x00,
     0x00,
@@ -91,7 +90,7 @@ uint8_t  const  UDISK_Rd_Format_Capacity[ ] =
 
 /******************************************************************************/
 /* capacity information */
-uint8_t  const  UDISK_Rd_Capacity[ ] =
+const uint8_t  code  UDISK_Rd_Capacity[ ] =
 {
     ( ( MY_UDISK_SIZE - 1 ) >> 24 ) & 0xFF,
     ( ( MY_UDISK_SIZE - 1 ) >> 16 ) & 0xFF,
@@ -105,7 +104,7 @@ uint8_t  const  UDISK_Rd_Capacity[ ] =
 
 /******************************************************************************/
 /* MODE_SENSE data,For CMD 0X1A */
-uint8_t  const  UDISK_Mode_Sense_1A[ ] =
+const uint8_t  code UDISK_Mode_Sense_1A[ ] =
 {
     0x0B,
     0x00,
@@ -123,7 +122,7 @@ uint8_t  const  UDISK_Mode_Sense_1A[ ] =
 
 /******************************************************************************/
 /* MODE_SENSE data,For CMD 0X5A */
-uint8_t  const  UDISK_Mode_Senese_5A[ ] =
+const uint8_t code UDISK_Mode_Senese_5A[ ] =
 {
     0x00,
     0x0E,
@@ -160,6 +159,132 @@ volatile uint16_t UDISK_Pack_Size = DEF_UDISK_PACK_64;
 BULK_ONLY_CMD mBOC;
 uint8_t   *pEndp2_Buf;
 
+
+/******************************************************************************/
+/* Use a tiny synthetic FAT12 disk for READ10 testing. */
+#define UDISK_FAKE_FAT12_TEST         1
+
+#if (UDISK_FAKE_FAT12_TEST == 1) && (DEF_UDISK_SECTOR_SIZE == 512)
+#define UDISK_FAKE_FAT12_ACTIVE       1
+#define UDISK_FAKE_RESERVED_SECTORS   1U
+#define UDISK_FAKE_NUM_FATS           2U
+#define UDISK_FAKE_ROOT_ENTRIES       16U
+#define UDISK_FAKE_SECTORS_PER_FAT    1U
+#define UDISK_FAKE_ROOT_DIR_SECTORS   ( ( ( UDISK_FAKE_ROOT_ENTRIES * 32U ) + ( DEF_UDISK_SECTOR_SIZE - 1U ) ) / DEF_UDISK_SECTOR_SIZE )
+#define UDISK_FAKE_FAT1_LBA           UDISK_FAKE_RESERVED_SECTORS
+#define UDISK_FAKE_FAT2_LBA           ( UDISK_FAKE_FAT1_LBA + UDISK_FAKE_SECTORS_PER_FAT )
+#define UDISK_FAKE_ROOT_DIR_LBA       ( UDISK_FAKE_FAT2_LBA + UDISK_FAKE_SECTORS_PER_FAT )
+
+static void UDISK_FakeDisk_SetByte( uint8_t *pbuf, uint16_t pack_offset, uint16_t sector_offset, uint8_t value )
+{
+    if( ( sector_offset >= pack_offset ) && ( sector_offset < ( pack_offset + UDISK_Pack_Size ) ) )
+    {
+        pbuf[ sector_offset - pack_offset ] = value;
+    }
+}
+
+static void UDISK_FakeDisk_SetArray( uint8_t *pbuf, uint16_t pack_offset, uint16_t sector_offset, const uint8_t *psrc, uint16_t len )
+{
+    uint16_t i;
+
+    for( i = 0; i < len; i++ )
+    {
+        UDISK_FakeDisk_SetByte( pbuf, pack_offset, sector_offset + i, psrc[ i ] );
+    }
+}
+
+static void UDISK_FakeDisk_SetLe16( uint8_t *pbuf, uint16_t pack_offset, uint16_t sector_offset, uint16_t value )
+{
+    UDISK_FakeDisk_SetByte( pbuf, pack_offset, sector_offset, (uint8_t)( value & 0xFF ) );
+    UDISK_FakeDisk_SetByte( pbuf, pack_offset, sector_offset + 1U, (uint8_t)( ( value >> 8 ) & 0xFF ) );
+}
+
+static void UDISK_FakeDisk_SetLe32( uint8_t *pbuf, uint16_t pack_offset, uint16_t sector_offset, uint32_t value )
+{
+    UDISK_FakeDisk_SetByte( pbuf, pack_offset, sector_offset, (uint8_t)( value & 0xFF ) );
+    UDISK_FakeDisk_SetByte( pbuf, pack_offset, sector_offset + 1U, (uint8_t)( ( value >> 8 ) & 0xFF ) );
+    UDISK_FakeDisk_SetByte( pbuf, pack_offset, sector_offset + 2U, (uint8_t)( ( value >> 16 ) & 0xFF ) );
+    UDISK_FakeDisk_SetByte( pbuf, pack_offset, sector_offset + 3U, (uint8_t)( ( value >> 24 ) & 0xFF ) );
+}
+
+static void UDISK_FakeDisk_FillBootPack( uint16_t pack_offset, uint8_t *pbuf )
+{
+    static const uint8_t jump_oem[ 11 ] = { 0xEB, 0x3C, 0x90, 'M', 'S', 'D', 'O', 'S', '5', '.', '0' };
+    static const uint8_t volume_label[ 11 ] = { 'C', 'H', '5', '5', '2', ' ', 'T', 'E', 'S', 'T', ' ' };
+    static const uint8_t filesystem_type[ 8 ] = { 'F', 'A', 'T', '1', '2', ' ', ' ', ' ' };
+
+    UDISK_FakeDisk_SetArray( pbuf, pack_offset, 0U, jump_oem, sizeof( jump_oem ) );
+    UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 11U, DEF_UDISK_SECTOR_SIZE );
+    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 13U, 0x01 );
+    UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 14U, UDISK_FAKE_RESERVED_SECTORS );
+    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 16U, UDISK_FAKE_NUM_FATS );
+    UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 17U, UDISK_FAKE_ROOT_ENTRIES );
+    if( MY_UDISK_SIZE <= 0xFFFFUL )
+    {
+        UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 19U, (uint16_t)MY_UDISK_SIZE );
+        UDISK_FakeDisk_SetLe32( pbuf, pack_offset, 32U, 0x00000000UL );
+    }
+    else
+    {
+        UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 19U, 0x0000 );
+        UDISK_FakeDisk_SetLe32( pbuf, pack_offset, 32U, MY_UDISK_SIZE );
+    }
+    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 21U, 0xF8 );
+    UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 22U, UDISK_FAKE_SECTORS_PER_FAT );
+    UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 24U, 0x0001 );
+    UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 26U, 0x0001 );
+    UDISK_FakeDisk_SetLe32( pbuf, pack_offset, 28U, 0x00000000UL );
+    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 36U, 0x80 );
+    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 38U, 0x29 );
+    UDISK_FakeDisk_SetLe32( pbuf, pack_offset, 39U, 0x20260320UL );
+    UDISK_FakeDisk_SetArray( pbuf, pack_offset, 43U, volume_label, sizeof( volume_label ) );
+    UDISK_FakeDisk_SetArray( pbuf, pack_offset, 54U, filesystem_type, sizeof( filesystem_type ) );
+    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 510U, 0x55 );
+    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 511U, 0xAA );
+}
+
+static void UDISK_FakeDisk_FillFatPack( uint16_t pack_offset, uint8_t *pbuf )
+{
+    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 0U, 0xF8 );
+    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 1U, 0xFF );
+    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 2U, 0xFF );
+}
+
+static void UDISK_FakeDisk_FillRootDirPack( uint16_t pack_offset, uint8_t *pbuf )
+{
+    static const uint8_t volume_label_entry[ 11 ] = { 'C', 'H', '5', '5', '2', ' ', 'T', 'E', 'S', 'T', ' ' };
+
+    UDISK_FakeDisk_SetArray( pbuf, pack_offset, 0U, volume_label_entry, sizeof( volume_label_entry ) );
+    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 11U, 0x08 );
+}
+
+static void UDISK_FakeDisk_ReadPack( uint32_t lba, uint16_t pack_index, uint8_t *pbuf )
+{
+    uint16_t pack_offset;
+
+    pack_offset = (uint16_t)( pack_index * UDISK_Pack_Size );
+    memset( pbuf, 0, UDISK_Pack_Size );
+
+    if( lba == 0U )
+    {
+        UDISK_FakeDisk_FillBootPack( pack_offset, pbuf );
+    }
+    else if( ( lba >= UDISK_FAKE_FAT1_LBA ) && ( lba < ( UDISK_FAKE_FAT1_LBA + UDISK_FAKE_SECTORS_PER_FAT ) ) )
+    {
+        UDISK_FakeDisk_FillFatPack( pack_offset, pbuf );
+    }
+    else if( ( lba >= UDISK_FAKE_FAT2_LBA ) && ( lba < ( UDISK_FAKE_FAT2_LBA + UDISK_FAKE_SECTORS_PER_FAT ) ) )
+    {
+        UDISK_FakeDisk_FillFatPack( pack_offset, pbuf );
+    }
+    else if( ( lba >= UDISK_FAKE_ROOT_DIR_LBA ) && ( lba < ( UDISK_FAKE_ROOT_DIR_LBA + UDISK_FAKE_ROOT_DIR_SECTORS ) ) )
+    {
+        UDISK_FakeDisk_FillRootDirPack( pack_offset, pbuf );
+    }
+}
+#else
+#define UDISK_FAKE_FAT12_ACTIVE       0
+#endif
 
 /*******************************************************************************
 * Function Name  : UDISK_Init
@@ -664,15 +789,20 @@ void UDISK_Up_OnePack( void )
 {
     uint8_t *pbuf = NULL;
 
-#if (STORAGE_MEDIUM == MEDIUM_SPI_FLASH)
-    if( UDISK_Sec_Pack_Count == 0x00 )
-    {
-        FLASH_RD_Block_Start( UDISK_Cur_Sec_Lba * DEF_UDISK_SECTOR_SIZE );
-    }
-    FLASH_RD_Block( UDisk_Pack_Buffer, UDISK_Pack_Size );
+#if UDISK_FAKE_FAT12_ACTIVE
+    UDISK_FakeDisk_ReadPack( UDISK_Cur_Sec_Lba, UDISK_Sec_Pack_Count, UDisk_Pack_Buffer );
     pbuf = UDisk_Pack_Buffer;
-#elif (STORAGE_MEDIUM == MEDIUM_INTERAL_FLASH)
-    pbuf = (uint8_t*)(IFLASH_UDISK_START_ADDR + UDISK_Cur_Sec_Lba * DEF_UDISK_SECTOR_SIZE + UDISK_Pack_Size * UDISK_Sec_Pack_Count);
+#else
+    #if (STORAGE_MEDIUM == MEDIUM_SPI_FLASH)
+        if( UDISK_Sec_Pack_Count == 0x00 )
+        {
+            FLASH_RD_Block_Start( UDISK_Cur_Sec_Lba * DEF_UDISK_SECTOR_SIZE );
+        }
+        FLASH_RD_Block( UDisk_Pack_Buffer, UDISK_Pack_Size );
+        pbuf = UDisk_Pack_Buffer;
+    #elif (STORAGE_MEDIUM == MEDIUM_INTERAL_FLASH)
+        pbuf = (uint8_t*)(IFLASH_UDISK_START_ADDR + UDISK_Cur_Sec_Lba * DEF_UDISK_SECTOR_SIZE + UDISK_Pack_Size * UDISK_Sec_Pack_Count);
+    #endif
 #endif
 
     /* USB upload this package data */
@@ -686,10 +816,13 @@ void UDISK_Up_OnePack( void )
     if( UDISK_Sec_Pack_Count == ( DEF_UDISK_SECTOR_SIZE / UDISK_Pack_Size ) )
     {
 #if (STORAGE_MEDIUM == MEDIUM_SPI_FLASH)
+#if !UDISK_FAKE_FAT12_ACTIVE
         PIN_FLASH_CS_HIGH( );
+#endif
 #endif
         UDISK_Sec_Pack_Count = 0x00;
         UDISK_Cur_Sec_Lba++;
+
     }
     /* Determine whether the current sector data is read and uploaded */
     if( UDISK_Transfer_DataLen == 0x00 )
