@@ -1,15 +1,12 @@
 #include "internal_flash.h"
 
-uint8_t flash_op_check_byte1 = 0x00;
-uint8_t flash_op_check_byte2 = 0x00;
-
-uint8_t flash_op_unlock(void)
+uint8_t __flash_op_unlock(void)
 {
     bit ea_state_save = 0;
 
-    /* Check the Flash operation flags to prevent Flash misoperation. */
-    if( ( flash_op_check_byte1 != DEF_FLASH_OP_CHECK1 ) ||
-        ( flash_op_check_byte2 != DEF_FLASH_OP_CHECK2 ) ) return 0xff;  /* Flash Operation Flags Error */
+    // /* Check the Flash operation flags to prevent Flash misoperation. */
+    // if( ( flash_op_check_byte1 != DEF_FLASH_OP_CHECK1 ) ||
+    //     ( flash_op_check_byte2 != DEF_FLASH_OP_CHECK2 ) ) return 0xff;  /* Flash Operation Flags Error */
 
     ea_state_save = EA;
     EA = 1;
@@ -25,7 +22,7 @@ uint8_t flash_op_unlock(void)
     return 0x00;
 }
 
-void flash_op_lock(void)
+void __flash_op_lock(void)
 {
     bit ea_state_save = 0;
 
@@ -37,7 +34,7 @@ void flash_op_lock(void)
     SAFE_MOD = 0x55;
     SAFE_MOD = 0xaa;
     GLOBAL_CFG &= ~bCODE_WE;
-    // SAFE_MOD = 0x00;
+    SAFE_MOD = 0x00;
 
     /* Restore all INTS */
     EA = ea_state_save;
@@ -45,8 +42,7 @@ void flash_op_lock(void)
 
 uint8_t write_code_flash(uint16_t addr, uint8_t *buf, uint16_t len)
 {
-    if (flash_op_unlock()) return 0xff;
-
+    if (__flash_op_unlock()) return 0xff;
 
     while (len--)
     {
@@ -56,20 +52,30 @@ uint8_t write_code_flash(uint16_t addr, uint8_t *buf, uint16_t len)
         ROM_DATA_H = *(buf + sizeof(uint8_t));
         buf = buf + sizeof(uint8_t)*2;
         addr = addr + 2;
-        ROM_CTRL = 0x09;  // do write operation
+        ROM_CTRL = ROM_CMD_WRITE;  // do write operation
         if (!(ROM_STATUS & 0x40))
         {
-            flash_op_lock();
+            __flash_op_lock();
             return 0xff;  // check write operation if sunccess
         }
     }
 
-    flash_op_lock();
+    __flash_op_lock();
     return 0x00;
 }
 
-void check_code_flash(uint16_t addr, uint8_t *buf, uint16_t len)
+void read_code_flash(uint16_t addr, uint8_t *buf, uint16_t len)
 {
-    uint16_t *p;
-    p = addr;
+    const uint8_t code *p_code = (const uint8_t code *)addr;
+
+    while (len--)
+    {
+        *buf++ = *p_code++;
+    }
 }
+
+// void check_code_flash(uint16_t addr, uint8_t *buf, uint16_t len)
+// {
+//     uint16_t *p;
+//     p = addr;
+// }

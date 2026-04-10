@@ -9,4 +9,7 @@
 #define DEF_FLASH_OP_CHECK1     0xAA
 #define DEF_FLASH_OP_CHECK2     0x55
 
+uint8_t write_code_flash(uint16_t addr, uint8_t *buf, uint16_t len);
+void read_code_flash(uint16_t addr, uint8_t *buf, uint16_t len);
+
 #endif

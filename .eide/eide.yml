@@ -18,6 +18,7 @@ virtualFolder:
           files:
             - path: Code/common/ch55x/gpio.c
             - path: Code/common/ch55x/system_ch55x.c
+            - path: Code/common/ch55x/uart.c
           folders: []
     - name: boot
       files:
@@ -33,7 +34,8 @@ virtualFolder:
       files: []
       folders: []
     - name: flash
-      files: []
+      files:
+        - path: Code/flash/internal_flash.c
       folders: []
     - name: fs
       files: []
