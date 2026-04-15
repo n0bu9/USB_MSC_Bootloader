@@ -9,7 +9,8 @@
     #include "uart.h"
 #endif
 
-uint8_t buff[10] = {0x66, 0x00};
+uint8_t buff[10] = {0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
+uint8_t read[10];
 
 void main()
 {
@@ -21,12 +22,12 @@ void main()
     delay_ms(10);
 #endif
     // bootloader_main_task();
-    if (write_code_flash(7900, &buff[0], 1) == 0xff)
+    if (write_code_flash(7900, &buff, 10) == 0xff)
         uart1_sendstr("ERR!\r\n", sizeof("ERR!\r\n"));
     else
-        read_code_flash(7900, &buff[1], 1);
-        if (buff[0] == buff[1]) LED_ON();
-    uart1_sendbyte(buff[1]);
+        read_code_flash(7900, &read, 10);
+        if (buff[0] == read[0]) LED_ON();
+    uart1_sendstr(read, 10);
 
     while (1){
         // uart1_sendbyte('A');
