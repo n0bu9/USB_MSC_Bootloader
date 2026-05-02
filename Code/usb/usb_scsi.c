@@ -183,7 +183,7 @@ static void UDISK_FakeDisk_SetByte( uint8_t *pbuf, uint16_t pack_offset, uint16_
     }
 }
 
-static void UDISK_FakeDisk_SetArray( uint8_t *pbuf, uint16_t pack_offset, uint16_t sector_offset, const uint8_t *psrc, uint16_t len )
+static void UDISK_FakeDisk_SetArray( uint8_t *pbuf, uint16_t pack_offset, uint16_t sector_offset, const uint8_t code *psrc, uint16_t len )
 {
     uint16_t i;
 
@@ -209,9 +209,9 @@ static void UDISK_FakeDisk_SetLe32( uint8_t *pbuf, uint16_t pack_offset, uint16_
 
 static void UDISK_FakeDisk_FillBootPack( uint16_t pack_offset, uint8_t *pbuf )
 {
-    static const uint8_t jump_oem[ 11 ] = { 0xEB, 0x3C, 0x90, 'M', 'S', 'D', 'O', 'S', '5', '.', '0' };
-    static const uint8_t volume_label[ 11 ] = { 'C', 'H', '5', '5', '2', ' ', 'T', 'E', 'S', 'T', ' ' };
-    static const uint8_t filesystem_type[ 8 ] = { 'F', 'A', 'T', '1', '2', ' ', ' ', ' ' };
+    static const uint8_t code jump_oem[ 11 ] = { 0xEB, 0x3C, 0x90, 'M', 'S', 'D', 'O', 'S', '5', '.', '0' };
+    static const uint8_t code volume_label[ 11 ] = { 'C', 'H', '5', '5', '2', ' ', 'T', 'E', 'S', 'T', ' ' };
+    static const uint8_t code filesystem_type[ 8 ] = { 'F', 'A', 'T', '1', '2', ' ', ' ', ' ' };
 
     UDISK_FakeDisk_SetArray( pbuf, pack_offset, 0U, jump_oem, sizeof( jump_oem ) );
     UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 11U, DEF_UDISK_SECTOR_SIZE );
@@ -252,7 +252,7 @@ static void UDISK_FakeDisk_FillFatPack( uint16_t pack_offset, uint8_t *pbuf )
 
 static void UDISK_FakeDisk_FillRootDirPack( uint16_t pack_offset, uint8_t *pbuf )
 {
-    static const uint8_t volume_label_entry[ 11 ] = { 'C', 'H', '5', '5', '2', ' ', 'T', 'E', 'S', 'T', ' ' };
+    static const uint8_t code volume_label_entry[ 11 ] = { 'C', 'H', '5', '5', '2', ' ', 'T', 'E', 'S', 'T', ' ' };
 
     UDISK_FakeDisk_SetArray( pbuf, pack_offset, 0U, volume_label_entry, sizeof( volume_label_entry ) );
     UDISK_FakeDisk_SetByte( pbuf, pack_offset, 11U, 0x08 );
@@ -659,6 +659,7 @@ void UDISK_In_EP_Deal( void )
         if( mBOC.mCBW.mCBW_CB_Buf[ 0 ] == CMD_U_READ10 )
         {
             UDISK_Up_OnePack( );
+            // UDISK_Up_CSW( );
         }
         else
         {
@@ -822,7 +823,6 @@ void UDISK_Up_OnePack( void )
 #endif
         UDISK_Sec_Pack_Count = 0x00;
         UDISK_Cur_Sec_Lba++;
-
     }
     /* Determine whether the current sector data is read and uploaded */
     if( UDISK_Transfer_DataLen == 0x00 )
