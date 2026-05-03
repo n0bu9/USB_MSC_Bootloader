@@ -16,6 +16,8 @@
 #include "internal_flash.h"
 #include "usb_basic.h"
 #include "string.h"
+#include "uart.h"
+#include "system_ch55x.h"
 
 // #include <SPI_FLASH.h>
 // #include <SW_UDISK.h>
@@ -155,6 +157,7 @@ volatile uint32_t UDISK_Transfer_DataLen = 0x00;
 volatile uint32_t UDISK_Cur_Sec_Lba = 0x00;
 volatile uint16_t UDISK_Sec_Pack_Count = 0x00;
 volatile uint16_t UDISK_Pack_Size = DEF_UDISK_PACK_64;
+static uint8_t first_in_flag = 0x01;
 
 BULK_ONLY_CMD mBOC;
 uint8_t   *pEndp2_Buf;
@@ -213,34 +216,43 @@ static void UDISK_FakeDisk_FillBootPack( uint16_t pack_offset, uint8_t *pbuf )
     static const uint8_t code volume_label[ 11 ] = { 'C', 'H', '5', '5', '2', ' ', 'T', 'E', 'S', 'T', ' ' };
     static const uint8_t code filesystem_type[ 8 ] = { 'F', 'A', 'T', '1', '2', ' ', ' ', ' ' };
 
-    UDISK_FakeDisk_SetArray( pbuf, pack_offset, 0U, jump_oem, sizeof( jump_oem ) );
-    UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 11U, DEF_UDISK_SECTOR_SIZE );
-    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 13U, 0x01 );
-    UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 14U, UDISK_FAKE_RESERVED_SECTORS );
-    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 16U, UDISK_FAKE_NUM_FATS );
-    UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 17U, UDISK_FAKE_ROOT_ENTRIES );
-    if( MY_UDISK_SIZE <= 0xFFFFUL )
+    if (pack_offset == 0U)
     {
-        UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 19U, (uint16_t)MY_UDISK_SIZE );
-        UDISK_FakeDisk_SetLe32( pbuf, pack_offset, 32U, 0x00000000UL );
+        memset( pbuf, 0, UDISK_Pack_Size );
+        UDISK_FakeDisk_SetArray( pbuf, pack_offset, 0U, jump_oem, sizeof( jump_oem ) );
+        UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 11U, DEF_UDISK_SECTOR_SIZE );
+        UDISK_FakeDisk_SetByte( pbuf, pack_offset, 13U, 0x01 );
+        UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 14U, UDISK_FAKE_RESERVED_SECTORS );
+        UDISK_FakeDisk_SetByte( pbuf, pack_offset, 16U, UDISK_FAKE_NUM_FATS );
+        UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 17U, UDISK_FAKE_ROOT_ENTRIES );
+        #if MY_UDISK_SIZE <= 0xFFFFUL
+            UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 19U, (uint16_t)MY_UDISK_SIZE );
+            UDISK_FakeDisk_SetLe32( pbuf, pack_offset, 32U, 0x00000000UL );
+        #else
+            UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 19U, 0x0000 );
+            UDISK_FakeDisk_SetLe32( pbuf, pack_offset, 32U, MY_UDISK_SIZE );
+        #endif
+        UDISK_FakeDisk_SetByte( pbuf, pack_offset, 21U, 0xF8 );
+        UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 22U, UDISK_FAKE_SECTORS_PER_FAT );
+        UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 24U, 0x0001 );
+        UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 26U, 0x0001 );
+        UDISK_FakeDisk_SetLe32( pbuf, pack_offset, 28U, 0x00000000UL );
+        UDISK_FakeDisk_SetByte( pbuf, pack_offset, 36U, 0x80 );
+        UDISK_FakeDisk_SetByte( pbuf, pack_offset, 38U, 0x29 );
+        UDISK_FakeDisk_SetLe32( pbuf, pack_offset, 39U, 0x20260320UL );
+        UDISK_FakeDisk_SetArray( pbuf, pack_offset, 43U, volume_label, sizeof( volume_label ) );
+        UDISK_FakeDisk_SetArray( pbuf, pack_offset, 54U, filesystem_type, sizeof( filesystem_type ) );
+    }
+    else if (pack_offset == 448U)
+    {
+        memset( pbuf, 0, UDISK_Pack_Size );
+        UDISK_FakeDisk_SetByte( pbuf, pack_offset, 510U, 0x55 );
+        UDISK_FakeDisk_SetByte( pbuf, pack_offset, 511U, 0xAA );
     }
     else
     {
-        UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 19U, 0x0000 );
-        UDISK_FakeDisk_SetLe32( pbuf, pack_offset, 32U, MY_UDISK_SIZE );
+        memset( pbuf, 0, UDISK_Pack_Size );
     }
-    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 21U, 0xF8 );
-    UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 22U, UDISK_FAKE_SECTORS_PER_FAT );
-    UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 24U, 0x0001 );
-    UDISK_FakeDisk_SetLe16( pbuf, pack_offset, 26U, 0x0001 );
-    UDISK_FakeDisk_SetLe32( pbuf, pack_offset, 28U, 0x00000000UL );
-    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 36U, 0x80 );
-    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 38U, 0x29 );
-    UDISK_FakeDisk_SetLe32( pbuf, pack_offset, 39U, 0x20260320UL );
-    UDISK_FakeDisk_SetArray( pbuf, pack_offset, 43U, volume_label, sizeof( volume_label ) );
-    UDISK_FakeDisk_SetArray( pbuf, pack_offset, 54U, filesystem_type, sizeof( filesystem_type ) );
-    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 510U, 0x55 );
-    UDISK_FakeDisk_SetByte( pbuf, pack_offset, 511U, 0xAA );
 }
 
 static void UDISK_FakeDisk_FillFatPack( uint16_t pack_offset, uint8_t *pbuf )
@@ -659,7 +671,6 @@ void UDISK_In_EP_Deal( void )
         if( mBOC.mCBW.mCBW_CB_Buf[ 0 ] == CMD_U_READ10 )
         {
             UDISK_Up_OnePack( );
-            // UDISK_Up_CSW( );
         }
         else
         {
@@ -668,6 +679,7 @@ void UDISK_In_EP_Deal( void )
     }
     else if( Udisk_Transfer_Status & DEF_UDISK_CSW_UP_FLAG )
     {
+        uart1_sendbyte(0xee);
         UDISK_Up_CSW( );
     }
 }
@@ -790,6 +802,18 @@ void UDISK_Up_OnePack( void )
 {
     uint8_t *pbuf = NULL;
 
+    // if ( first_in_flag )
+    // {
+    //     first_in_flag = 0x00;
+    //     uart1_sendbyte(UDISK_Transfer_DataLen / 100);
+    //     uart1_sendbyte((UDISK_Transfer_DataLen % 100));
+    //     // uart1_sendbyte((UDISK_Transfer_DataLen % 10));
+    //     if (UDISK_Transfer_DataLen == 512)
+    //     {
+    //         uart1_sendbyte(0xFE);
+    //     }
+    // }
+
 #if UDISK_FAKE_FAT12_ACTIVE
     UDISK_FakeDisk_ReadPack( UDISK_Cur_Sec_Lba, UDISK_Sec_Pack_Count, UDisk_Pack_Buffer );
     pbuf = UDisk_Pack_Buffer;
@@ -810,9 +834,18 @@ void UDISK_Up_OnePack( void )
     USB_SIL_Write( EP_NUM_2, pbuf, UDISK_Pack_Size );
     SetEPTxStatus( EP_NUM_2, EP_TX_VALID );
 
+    if( UDISK_Transfer_DataLen > UDISK_Pack_Size )
+    {
+        UDISK_Transfer_DataLen -= UDISK_Pack_Size;
+    }
+    else
+    {
+        UDISK_Transfer_DataLen = 0x00;
+    }
+
+    uart1_sendbyte(0xAE);
     /* Determine whether the current sector data is read and uploaded */
     UDISK_Sec_Pack_Count++;
-    UDISK_Transfer_DataLen -= UDISK_Pack_Size;
 
     if( UDISK_Sec_Pack_Count == ( DEF_UDISK_SECTOR_SIZE / UDISK_Pack_Size ) )
     {
@@ -824,11 +857,17 @@ void UDISK_Up_OnePack( void )
         UDISK_Sec_Pack_Count = 0x00;
         UDISK_Cur_Sec_Lba++;
     }
-    /* Determine whether the current sector data is read and uploaded */
+
     if( UDISK_Transfer_DataLen == 0x00 )
     {
         Udisk_Transfer_Status &= ~DEF_UDISK_BLUCK_UP_FLAG;
+        uart1_sendbyte(Udisk_Transfer_Status);
     }
+    /* Determine whether the current sector data is read and uploaded */
+    // if( UDISK_Transfer_DataLen == 0x40 || UDISK_Transfer_DataLen == 0x00 )
+    // {
+    //     Udisk_Transfer_Status &= ~DEF_UDISK_BLUCK_UP_FLAG;
+    // }
 }
 
 /*******************************************************************************

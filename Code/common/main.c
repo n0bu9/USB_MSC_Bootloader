@@ -17,10 +17,11 @@ void main()
     system_init();
     EA = 1;
     Port_LED_Init();
-// #ifdef PRINTF_DEBUG
-//     uart1_init();
-//     delay_ms(10);
-// #endif
+#ifdef PRINTF_DEBUG
+    uart1_init();
+    delay_ms(10);
+    uart1_sendbyte(0x36);
+#endif
     bootloader_main_task();
     // if (write_code_flash(7900, &buff, 10) == 0xff)
         // uart1_sendstr("ERR!\r\n", sizeof("ERR!\r\n"));

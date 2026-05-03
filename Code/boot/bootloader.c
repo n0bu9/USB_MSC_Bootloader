@@ -74,16 +74,16 @@ void __bl_states_task(boot_state_t *boot_state)
     }
 }
 
-void bootloader_jump_to_app()
-{
-    // 定义函数指针，指向应用程序的入口地址
-    userTask = (pTaskFn)APP_START_ADDR;
-    // 关闭所有外设，复位系统状态
-    // 例如：关闭USB、定时器等
+// void bootloader_jump_to_app()
+// {
+//     // 定义函数指针，指向应用程序的入口地址
+//     userTask = (pTaskFn)APP_START_ADDR;
+//     // 关闭所有外设，复位系统状态
+//     // 例如：关闭USB、定时器等
 
-    // 跳转到应用程序
-    userTask();
-}
+//     // 跳转到应用程序
+//     userTask();
+// }
 
 void bootloader_main_task(void)
 {

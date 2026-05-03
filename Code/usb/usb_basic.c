@@ -92,6 +92,7 @@ void usbfs_device_init(void)
     UEP0_CTRL = UEP_R_RES_ACK | UEP_T_RES_NAK;                                 // OUT事务返回ACK，IN事务返回NAK
     // EndPoint 2
     UEP2_DMA = ep2_buffer;                                                     // 端点2数据传输地址
+    // UEP2_3_MOD = UEP2_3_MOD | bUEP2_BUF_MOD | bUEP2_TX_EN | bUEP2_RX_EN;   // 端点2 64字节发送(IN)+64字节接收(OUT)缓冲区
     UEP2_3_MOD = ( UEP2_3_MOD & ~bUEP2_BUF_MOD ) | bUEP2_TX_EN | bUEP2_RX_EN;  // 端点2 64字节发送(IN)+64字节接收(OUT)缓冲区
     UEP2_CTRL = UEP_T_RES_NAK | UEP_R_RES_ACK;                                 // 端点2双向同时启用时需手动翻转toggle
     // Other Init

@@ -3,7 +3,7 @@
 
 /*******************************************************************************
 * Function Name  : uart1_init()
-* Description    : CH554串口1初始化
+* Description    : CH554串口1初始化 P1.6--RXD P1.7--TXD
 * Input          : None
 * Output         : None
 * Return         : None
