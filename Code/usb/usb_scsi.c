@@ -406,6 +406,7 @@ void CMD_RD_WR_Deal_Pre( void )
 void UDISK_SCSI_CMD_Deal( void )
 {
     uint8_t i;
+    uint32_t cbw_data_len;
 
     if( ( mBOC.mCBW.mCBW_Sig[ 0 ] == 'U' ) && ( mBOC.mCBW.mCBW_Sig[ 1 ] == 'S' )
     &&( mBOC.mCBW.mCBW_Sig[ 2 ] == 'B' ) && ( mBOC.mCBW.mCBW_Sig[ 3 ] == 'C' ) )
@@ -415,10 +416,11 @@ void UDISK_SCSI_CMD_Deal( void )
         Udisk_CBW_Tag_Save[ 2 ] = mBOC.mCBW.mCBW_Tag[ 2 ];
         Udisk_CBW_Tag_Save[ 3 ] = mBOC.mCBW.mCBW_Tag[ 3 ];
 
-        UDISK_Transfer_DataLen = ( uint32_t )mBOC.mCBW.mCBW_DataLen[ 3 ] << 24;
-        UDISK_Transfer_DataLen += ( ( uint32_t )mBOC.mCBW.mCBW_DataLen[ 2 ] << 16 );
-        UDISK_Transfer_DataLen += ( ( uint32_t )mBOC.mCBW.mCBW_DataLen[ 1 ] << 8 );
-        UDISK_Transfer_DataLen += ( ( uint32_t )mBOC.mCBW.mCBW_DataLen[ 0 ] );
+        cbw_data_len = ( uint32_t )mBOC.mCBW.mCBW_DataLen[ 3 ] << 24;
+        cbw_data_len += ( ( uint32_t )mBOC.mCBW.mCBW_DataLen[ 2 ] << 16 );
+        cbw_data_len += ( ( uint32_t )mBOC.mCBW.mCBW_DataLen[ 1 ] << 8 );
+        cbw_data_len += ( ( uint32_t )mBOC.mCBW.mCBW_DataLen[ 0 ] );
+        UDISK_Transfer_DataLen = cbw_data_len;
 
         if( UDISK_Transfer_DataLen )
         {
@@ -511,11 +513,15 @@ void UDISK_SCSI_CMD_Deal( void )
                 }
                 break;
 
-            case  CMD_U_READ10:
+        case  CMD_U_READ10:
                 /* CMD: 0x28 */
                 if( ( Udisk_Status & DEF_UDISK_EN_FLAG ) )
                 {
                     CMD_RD_WR_Deal_Pre( );
+                    if( UDISK_Transfer_DataLen > cbw_data_len )
+                    {
+                        UDISK_Transfer_DataLen = cbw_data_len;
+                    }
                 }
                 else
                 {
@@ -670,7 +676,15 @@ void UDISK_In_EP_Deal( void )
     {
         if( mBOC.mCBW.mCBW_CB_Buf[ 0 ] == CMD_U_READ10 )
         {
-            UDISK_Up_OnePack( );
+            if( UDISK_Transfer_DataLen == 0x00 )
+            {
+                Udisk_Transfer_Status &= ~DEF_UDISK_BLUCK_UP_FLAG;
+                UDISK_Up_CSW( );
+            }
+            else
+            {
+                UDISK_Up_OnePack( );
+            }
         }
         else
         {
@@ -679,7 +693,6 @@ void UDISK_In_EP_Deal( void )
     }
     else if( Udisk_Transfer_Status & DEF_UDISK_CSW_UP_FLAG )
     {
-        uart1_sendbyte(0xee);
         UDISK_Up_CSW( );
     }
 }
@@ -786,6 +799,8 @@ void UDISK_Up_CSW( void )
     mBOC.mCSW.mCSW_Residue[ 3 ] = 0x00;
     mBOC.mCSW.mCSW_Status = Udisk_CSW_Status;
 
+    uart1_sendbyte(0xee);
+
     /* Load the data into the upload buffer and start the upload */
     USB_SIL_Write( EP_NUM_2, (uint8_t *)mBOC.buf, 0x0D );
     SetEPTxStatus( EP_NUM_2, EP_TX_VALID );
@@ -856,12 +871,6 @@ void UDISK_Up_OnePack( void )
 #endif
         UDISK_Sec_Pack_Count = 0x00;
         UDISK_Cur_Sec_Lba++;
-    }
-
-    if( UDISK_Transfer_DataLen == 0x00 )
-    {
-        Udisk_Transfer_Status &= ~DEF_UDISK_BLUCK_UP_FLAG;
-        uart1_sendbyte(Udisk_Transfer_Status);
     }
     /* Determine whether the current sector data is read and uploaded */
     // if( UDISK_Transfer_DataLen == 0x40 || UDISK_Transfer_DataLen == 0x00 )

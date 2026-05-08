@@ -207,9 +207,11 @@ void usbfs_device_interrupt(void) interrupt INT_NO_USB using 1
                 }
                 break;
             case UIS_TOKEN_IN | 2:                                    // endpoint 2# 批量端点上传
-                UEP2_CTRL ^= bUEP_T_TOG;
-                SetEPTxStatus(EP_NUM_2, EP_TX_NAK);
-                UDISK_In_EP_Deal();
+                if ( U_TOG_OK ) {
+                    UEP2_CTRL ^= bUEP_T_TOG;
+                    SetEPTxStatus(EP_NUM_2, EP_TX_NAK);
+                    UDISK_In_EP_Deal();
+                }
                 break;
             case UIS_TOKEN_SETUP | 0:                                 // endpoint 0# SETUP
                 len = USB_RX_LEN;
